@@ -1,0 +1,33 @@
+[package]
+name = "service-helpe-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default=[]
+tracing-gelf=["dep:tracing-gelf", "tracing-log", "tracing-subscriber", "dep:tokio", "atty"]
+metrics=["prometheus"]
+tokio=["dep:tokio"]
+warp=["dep:warp"]
+axum=["dep:axum", "http", "lazy_static", "futures"]
+
+[dependencies]
+serde={version="^1.0", features=["derive"]}
+tracing-subscriber = {version="0.3", features=["env-filter"], optional = true}
+tracing-log = {version="0.1", optional = true}
+tracing-gelf= {version="0.7", optional = true}
+tokio = {version="^1.0", features=["rt"], optional = true}
+anyhow="1"
+thiserror="1"
+prometheus={version="0.13", optional = true}
+log="0.4"
+warp={version="0.3", optional = true}
+atty={version="0.2", optional = true}
+
+http={version="0.2", optional = true}
+axum = { version = "0.5", optional = true }
+lazy_static={version="^1.4", optional=true}
+futures={version = "0.3", optional = true}
