@@ -4,11 +4,8 @@ pub mod tracing_gelf;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 
-#[cfg(all(feature = "warp", feature = "metrics"))]
-pub mod warp_metrics;
-
-#[cfg(all(feature = "warp"))]
-pub mod warp_error;
+#[cfg(feature = "warp")]
+pub mod warp;
 
 #[cfg(feature = "axum")]
 pub mod axum;
