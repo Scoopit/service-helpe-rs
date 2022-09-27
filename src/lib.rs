@@ -10,10 +10,12 @@ pub mod warp_metrics;
 #[cfg(all(feature = "warp"))]
 pub mod warp_error;
 
-#[cfg(all(feature = "axum", feature = "metrics"))]
-pub mod axum_metrics;
+#[cfg(feature = "axum")]
+pub mod axum;
 
 pub mod errors;
+
+pub mod config;
 
 /// Struct used to describe the service (typically used in logging services)
 pub struct ServiceDef<'a> {
