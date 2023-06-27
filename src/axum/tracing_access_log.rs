@@ -43,8 +43,8 @@ pub async fn access_log<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse 
         let _enter = span.enter();
         log::log!(
             target: "access_log",
-            log::Level::Info,
-            "{method} {path} Received",
+            log::Level::Debug,
+            "{method} {path} received",
         );
     }
 
