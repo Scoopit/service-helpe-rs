@@ -41,9 +41,8 @@ pub async fn access_log<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse 
     };
     if log {
         let _enter = span.enter();
-        log::log!(
+        tracing::debug!(
             target: "access_log",
-            log::Level::Debug,
             "{method} {path} received",
         );
     }
@@ -53,9 +52,10 @@ pub async fn access_log<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse 
             if log {
                 let elapsed = start.elapsed().as_millis();
                 let status = r.status().as_u16();
-                log::log!(
+                tracing::info!(
                     target: "access_log",
-                    log::Level::Info,
+                    "http.response.status_code" = status,
+                    "transaction.duration_ms" = elapsed,
                     "{method} {path} {status} {elapsed}ms",
                 );
             }
