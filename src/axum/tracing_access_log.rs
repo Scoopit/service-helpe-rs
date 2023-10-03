@@ -4,7 +4,7 @@ use axum::{extract::ConnectInfo, middleware::Next, response::IntoResponse};
 use data_encoding::BASE64URL_NOPAD;
 use futures::FutureExt;
 use http::Request;
-use tracing::{error_span, Instrument};
+use tracing::{error_span, Instrument, Level};
 
 /// Logs every request to `access_log` target in Info.
 ///
@@ -52,10 +52,11 @@ pub async fn access_log<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse 
             if log {
                 let elapsed = start.elapsed().as_millis();
                 let status = r.status().as_u16();
-                tracing::info!(
+                tracing::event!(
                     target: "access_log",
-                    "http.response.status_code" = status,
-                    "transaction.duration_ms" = elapsed,
+                    Level::INFO,
+                    transaction.duration_ms = elapsed,
+                    http.response.status_code = status,
                     "{method} {path} {status} {elapsed}ms",
                 );
             }
