@@ -1,9 +1,8 @@
 use std::time::Instant;
 
-use axum::middleware::Next;
 use axum::response::IntoResponse;
+use axum::{extract::Request, middleware::Next};
 use futures::FutureExt;
-use http::Request;
 use lazy_static::lazy_static;
 use prometheus::{Histogram, IntCounterVec, IntGauge};
 
@@ -37,7 +36,7 @@ lazy_static! {
     );
 }
 
-pub async fn metrics_middleware<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse {
+pub async fn metrics_middleware(req: Request, next: Next) -> impl IntoResponse {
     // do not record metrics on /metrics nor /health endpoint
     let path = req.uri().path();
     let record_metrics = path != "/metrics" && path != "/health";

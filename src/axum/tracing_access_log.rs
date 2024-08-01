@@ -1,9 +1,12 @@
 use std::{net::SocketAddr, time::Instant};
 
-use axum::{extract::ConnectInfo, middleware::Next, response::IntoResponse};
+use axum::{
+    extract::{ConnectInfo, Request},
+    middleware::Next,
+    response::IntoResponse,
+};
 use data_encoding::BASE64URL_NOPAD;
 use futures::FutureExt;
-use http::Request;
 use tracing::{error_span, Instrument, Level};
 
 /// Logs every request to `access_log` target in Info.
@@ -13,7 +16,7 @@ use tracing::{error_span, Instrument, Level};
 /// - `method`
 /// - `path`
 /// - `remote_ip` if the service has a ConnectInfo<RemoteAddr> in a request extention
-pub async fn access_log<B>(req: Request<B>, next: Next<B>) -> impl IntoResponse {
+pub async fn access_log(req: Request, next: Next) -> impl IntoResponse {
     // do not record metrics on /metrics nor /health endpoint
     let path = req.uri().path().to_string();
     let log = path != "/metrics" && path != "/health";
