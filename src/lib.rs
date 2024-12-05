@@ -4,6 +4,9 @@ pub mod tracing_gelf;
 #[cfg(feature = "metrics")]
 pub mod metrics;
 
+#[cfg(feature = "metrics")]
+pub use prometheus;
+
 #[cfg(feature = "warp")]
 pub mod warp;
 
