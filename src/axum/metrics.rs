@@ -28,14 +28,12 @@ lazy_static! {
     pub static ref INFLIGHT_REQUESTS: IntGauge = create_gauge(
         "inflight_http_request_total",
         "Number of requests being processed"
-    )
-    .expect("Unable to create inflight_http_request_total counter!");
+    );
     pub static ref REQUEST_TOTAL: IntCounterVec = create_counter_with_labels(
         "http_request_total",
         "HTTP requests handled",
         &["method", "status"]
-    )
-    .expect("Unable to create http_request_total counter!");
+    );
 }
 
 pub async fn metrics_middleware(req: Request, next: Next) -> impl IntoResponse {
