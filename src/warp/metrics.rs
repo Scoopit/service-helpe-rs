@@ -4,18 +4,20 @@ use warp::filters::log::{Info, Log};
 use crate::metrics::create_counter_with_labels;
 
 pub fn requests_metrics(report_by_path: bool) -> Log<impl Fn(Info) + Clone> {
-    let total = Arc::new(create_counter_with_labels(
-        "http_request_total",
-        "HTTP requests handled",
-        &["status"],
-    ));
+    let total = Arc::new(
+        create_counter_with_labels("http_request_total", "HTTP requests handled", &["status"])
+            .expect("Unable to create http_request_total counter"),
+    );
 
     let by_path = if report_by_path {
-        Some(Arc::new(create_counter_with_labels(
-            "http_request_by_path_total",
-            "HTTP requests handled",
-            &["path", "status"],
-        )))
+        Some(Arc::new(
+            create_counter_with_labels(
+                "http_request_by_path_total",
+                "HTTP requests handled",
+                &["path", "status"],
+            )
+            .expect("Unable to create http_request_by_path_total counter"),
+        ))
     } else {
         None
     };
@@ -28,7 +30,8 @@ pub fn requests_metrics(report_by_path: bool) -> Log<impl Fn(Info) + Clone> {
             ]),
     )
     .unwrap();
-    prometheus::register(Box::new(request_duration.clone())).unwrap();
+    prometheus::register(Box::new(request_duration.clone()))
+        .expect("Unable to register http_request_duration_seconds");
 
     let request_duration_by_path = if report_by_path {
         let request_duration_by_path = prometheus::HistogramVec::new(

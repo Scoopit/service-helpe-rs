@@ -4,44 +4,52 @@ use std::time::Duration;
 /// Helper methods used to creates metrics
 ///
 
-/// Unconditionnaly creates a counter and register it.
+/// Creates a counter and register it.
 ///
-/// It will panic if the counter is already registered
+/// It will return an error if the counter is already registered
 ///
-pub fn create_counter(name: &str, help: &str) -> IntCounter {
-    let counter = IntCounter::new(name, help).unwrap();
-    prometheus::register(Box::new(counter.clone())).unwrap();
-    counter
+pub fn create_counter(name: &str, help: &str) -> prometheus::Result<IntCounter> {
+    let counter = IntCounter::new(name, help)?;
+    prometheus::register(Box::new(counter.clone()))?;
+    Ok(counter)
 }
 
-/// Unconditionnaly creates a counter and register it.
+/// Creates a counter and register it.
 ///
-/// It will panic if the counter is already registered
+/// It will return an error if the counter is already registered
 ///
-pub fn create_counter_with_labels(name: &str, help: &str, labels: &[&str]) -> IntCounterVec {
-    let counter = IntCounterVec::new(Opts::new(name, help), labels).unwrap();
-    prometheus::register(Box::new(counter.clone())).unwrap();
-    counter
+pub fn create_counter_with_labels(
+    name: &str,
+    help: &str,
+    labels: &[&str],
+) -> prometheus::Result<IntCounterVec> {
+    let counter = IntCounterVec::new(Opts::new(name, help), labels)?;
+    prometheus::register(Box::new(counter.clone()))?;
+    Ok(counter)
 }
 
-/// Unconditionnaly creates a gauge and register it.
+/// Creates a gauge and register it.
 ///
-/// It will panic if the gauge is already registered
+/// It will return an error if the gauge is already registered
 ///
-pub fn create_gauge(name: &str, help: &str) -> IntGauge {
-    let gauge = IntGauge::new(name, help).unwrap();
-    prometheus::register(Box::new(gauge.clone())).unwrap();
-    gauge
+pub fn create_gauge(name: &str, help: &str) -> prometheus::Result<IntGauge> {
+    let gauge = IntGauge::new(name, help)?;
+    prometheus::register(Box::new(gauge.clone()))?;
+    Ok(gauge)
 }
 
-/// Unconditionnaly creates a gauge and register it.
+/// Creates a gauge and register it.
 ///
-/// It will panic if the gauge is already registered
+/// It will return an error if the gauge is already registered
 ///
-pub fn create_gauge_with_labels(name: &str, help: &str, labels: &[&str]) -> IntGaugeVec {
-    let gauge = IntGaugeVec::new(Opts::new(name, help), labels).unwrap();
-    prometheus::register(Box::new(gauge.clone())).unwrap();
-    gauge
+pub fn create_gauge_with_labels(
+    name: &str,
+    help: &str,
+    labels: &[&str],
+) -> prometheus::Result<IntGaugeVec> {
+    let gauge = IntGaugeVec::new(Opts::new(name, help), labels)?;
+    prometheus::register(Box::new(gauge.clone()))?;
+    Ok(gauge)
 }
 
 /// Generate the content of /metrics prometheus metrics gathering endpoint.
