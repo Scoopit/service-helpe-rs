@@ -1,0 +1,15 @@
+
+stages:
+  - build
+  - release
+build:
+  stage: build
+  script:
+    - RUST_BACKTRACE=1 cargo test --all-features
+
+release:
+  stage: release
+  only: 
+    - tags
+  script:
+    - just publish
