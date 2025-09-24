@@ -1,21 +1,29 @@
-use std::sync::Arc;
+use std::collections::HashSet;
 use warp::filters::log::{Info, Log};
 
 use crate::metrics::create_counter_with_labels;
 
-pub fn requests_metrics(report_by_path: bool) -> Log<impl Fn(Info) + Clone> {
-    let total = Arc::new(create_counter_with_labels(
-        "http_request_total",
-        "HTTP requests handled",
-        &["status"],
-    ));
+/// Warp filter to log requests metrics
+///
+/// If `report_by_path` is true, metrics will be reported by path. `path_allow_list` can be used to filter paths to report,
+/// if None is provided, all paths will be reported. Ignored path will be reported as "__other__".
+///
+pub fn requests_metrics(
+    report_by_path: bool,
+    path_allow_list: Option<&[&str]>,
+) -> Log<impl Fn(Info) + Clone> {
+    let path_allow_list =
+        path_allow_list.map(|list| list.iter().map(|s| s.to_string()).collect::<HashSet<_>>());
+
+    let total =
+        create_counter_with_labels("http_request_total", "HTTP requests handled", &["status"]);
 
     let by_path = if report_by_path {
-        Some(Arc::new(create_counter_with_labels(
+        Some(create_counter_with_labels(
             "http_request_by_path_total",
             "HTTP requests handled",
             &["path", "status"],
-        )))
+        ))
     } else {
         None
     };
@@ -54,16 +62,23 @@ pub fn requests_metrics(report_by_path: bool) -> Log<impl Fn(Info) + Clone> {
             return;
         }
         total
-            .clone()
             .get_metric_with_label_values(&[&format!("{}", info.status().as_u16())])
             .unwrap()
             .inc();
+
+        let path = if let Some(allow_list) = path_allow_list.as_ref() {
+            if allow_list.contains(info.path()) {
+                info.path()
+            } else {
+                "__other__"
+            }
+        } else {
+            info.path()
+        };
+
         if let Some(by_path) = by_path.clone() {
             by_path
-                .get_metric_with_label_values(&[
-                    info.path(),
-                    &format!("{}", info.status().as_u16()),
-                ])
+                .get_metric_with_label_values(&[path, &format!("{}", info.status().as_u16())])
                 .unwrap()
                 .inc();
         }
@@ -72,7 +87,7 @@ pub fn requests_metrics(report_by_path: bool) -> Log<impl Fn(Info) + Clone> {
 
         if let Some(request_duration_by_path) = request_duration_by_path.clone() {
             request_duration_by_path
-                .get_metric_with_label_values(&[info.path()])
+                .get_metric_with_label_values(&[path])
                 .unwrap()
                 .observe(info.elapsed().as_secs_f64());
         }
@@ -82,5 +97,5 @@ pub fn requests_metrics(report_by_path: bool) -> Log<impl Fn(Info) + Clone> {
 #[cfg(test)]
 #[test]
 fn test() {
-    requests_metrics(true);
+    requests_metrics(true, None);
 }
