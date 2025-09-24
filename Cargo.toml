@@ -36,7 +36,7 @@ anyhow = "1"
 thiserror = "2"
 prometheus = { version = "0.14", features = ["process"], optional = true }
 log = "0.4"
-warp = { version = "0.3", optional = true }
+warp = { version = "0.4", optional = true }
 atty = { version = "0.2", optional = true }
 
 http = { version = "1", optional = true }
