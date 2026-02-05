@@ -1,3 +1,5 @@
+use std::io::{stdout, IsTerminal};
+
 use serde::{Deserialize, Serialize};
 use tracing_gelf::Logger;
 use tracing_log::LogTracer;
@@ -12,9 +14,10 @@ pub struct GelfParams {
 }
 
 pub fn init<'a>(gelf: Option<GelfParams>, service: ServiceDef<'a>) -> anyhow::Result<()> {
+    let enable_colors = stdout().is_terminal();
     let stdout = SubscriberBuilder::default()
         // only enable colored output on real terminals
-        .with_ansi(atty::is(atty::Stream::Stdout))
+        .with_ansi(enable_colors)
         .with_env_filter(EnvFilter::from_default_env())
         // build but do not install the subscriber.
         .finish();
