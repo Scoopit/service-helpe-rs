@@ -13,7 +13,6 @@ tracing-gelf = [
     "tracing-log",
     "tracing-subscriber",
     "dep:tokio",
-    "atty",
 ]
 metrics = ["prometheus"]
 tokio = ["dep:tokio"]
