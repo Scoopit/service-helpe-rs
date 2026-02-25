@@ -4,6 +4,10 @@ use log::warn;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
+/// Default claims type when no specific structure is needed.
+/// Allows claims to be any valid JSON object.
+pub type AnyClaims = serde_json::Value;
+
 /// Validates JWTs signed with the ES256 algorithm.
 ///
 /// Public keys are loaded from a YAML file where each entry maps a key
@@ -174,7 +178,6 @@ pub mod warp {
 mod tests {
     use super::*;
     use jsonwebtoken::{encode, EncodingKey, Header};
-    use serde_json::Value;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -264,7 +267,7 @@ mod tests {
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(Some("test-key"));
         let auth = format!("Bearer {}", token);
-        assert!(validator.validate_bearer_token::<Value>(&auth).is_ok());
+        assert!(validator.validate_bearer_token::<AnyClaims>(&auth).is_ok());
     }
 
     #[test]
@@ -273,7 +276,7 @@ mod tests {
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(None);
         let auth = format!("Bearer {}", token);
-        assert!(validator.validate_bearer_token::<Value>(&auth).is_ok());
+        assert!(validator.validate_bearer_token::<AnyClaims>(&auth).is_ok());
     }
 
     #[test]
@@ -282,7 +285,7 @@ mod tests {
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(Some("unknown-key"));
         let auth = format!("Bearer {}", token);
-        let result = validator.validate_bearer_token::<Value>(&auth);
+        let result = validator.validate_bearer_token::<AnyClaims>(&auth);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Unknown key id"));
     }
@@ -292,7 +295,7 @@ mod tests {
         let file = create_keys_yaml(&[("test-key", TEST_EC_PUBLIC_KEY_PEM)]);
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(Some("test-key"));
-        let result = validator.validate_bearer_token::<Value>(&token);
+        let result = validator.validate_bearer_token::<AnyClaims>(&token);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Missing Bearer"));
     }
@@ -301,7 +304,7 @@ mod tests {
     fn validate_empty_bearer_token() {
         let file = create_keys_yaml(&[("test-key", TEST_EC_PUBLIC_KEY_PEM)]);
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
-        let result = validator.validate_bearer_token::<Value>("Bearer ");
+        let result = validator.validate_bearer_token::<AnyClaims>("Bearer ");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("empty"));
     }
@@ -310,7 +313,7 @@ mod tests {
     fn validate_garbage_token() {
         let file = create_keys_yaml(&[("test-key", TEST_EC_PUBLIC_KEY_PEM)]);
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
-        let result = validator.validate_bearer_token::<Value>("Bearer not.a.valid.jwt");
+        let result = validator.validate_bearer_token::<AnyClaims>("Bearer not.a.valid.jwt");
         assert!(result.is_err());
     }
 
@@ -325,7 +328,7 @@ mod tests {
         if let Ok(v) = validator {
             let token = make_token(None);
             let auth = format!("Bearer {}", token);
-            assert!(v.validate_bearer_token::<Value>(&auth).is_err());
+            assert!(v.validate_bearer_token::<AnyClaims>(&auth).is_err());
         }
     }
 
@@ -342,7 +345,7 @@ mod tests {
         let token = encode(&header, &claims, &key).unwrap();
         let auth = format!("Bearer {}", token);
 
-        let result = validator.validate_bearer_token::<Value>(&auth);
+        let result = validator.validate_bearer_token::<AnyClaims>(&auth);
         assert!(result.is_err());
     }
 }
