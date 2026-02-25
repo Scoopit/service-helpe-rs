@@ -1,15 +1,31 @@
 use anyhow::{anyhow, Context};
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 use log::warn;
-use serde_json::Value;
+use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
+/// Validates JWTs signed with the ES256 algorithm.
+///
+/// Public keys are loaded from a YAML file where each entry maps a key
+/// identifier (`kid`) to its PEM-encoded public key.
 pub struct JwtValidator {
     keys: HashMap<String, DecodingKey>,
     validation: Validation,
 }
 
 impl JwtValidator {
+    /// Loads public keys from a YAML file.
+    ///
+    /// The file must follow this format:
+    /// ```yaml
+    /// key-id-1: |
+    ///   -----BEGIN PUBLIC KEY-----
+    ///   ...
+    ///   -----END PUBLIC KEY-----
+    /// ```
+    ///
+    /// Returns an error if the file is not found, malformed, or contains an
+    /// invalid PEM key.
     pub fn load_from_file(path: &str) -> anyhow::Result<Self> {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Unable to read JWT keys file {}", path))?;
@@ -32,11 +48,25 @@ impl JwtValidator {
         Ok(Self { keys, validation })
     }
 
+    /// Returns the number of loaded public keys.
     pub fn keys_count(&self) -> usize {
         self.keys.len()
     }
 
-    pub fn validate_bearer_token(&self, authorization: &str) -> anyhow::Result<()> {
+    /// Validates a JWT passed in an `Authorization: Bearer <token>` header and
+    /// deserializes its claims into `C`.
+    ///
+    /// The following checks are performed:
+    /// - presence of the `Bearer` prefix
+    /// - ES256 algorithm
+    /// - signature against the known keys (targeting `kid` when present)
+    /// - token expiry
+    ///
+    /// Returns the deserialized claims on success, or a descriptive error otherwise.
+    pub fn validate_bearer_token<C: DeserializeOwned>(
+        &self,
+        authorization: &str,
+    ) -> anyhow::Result<C> {
         let token = authorization
             .strip_prefix("Bearer ")
             .ok_or_else(|| anyhow!("Missing Bearer prefix"))?
@@ -56,40 +86,56 @@ impl JwtValidator {
                 return Err(anyhow!("Unknown key id {}", kid));
             };
 
-            decode::<Value>(token, key, &self.validation).context("Invalid JWT signature")?;
-            return Ok(());
+            let claims =
+                decode::<C>(token, key, &self.validation).context("Invalid JWT signature")?;
+            return Ok(claims.claims);
         }
 
-        if self
+        if let Some(claims) = self
             .keys
             .values()
-            .any(|key| decode::<Value>(token, key, &self.validation).is_ok())
+            .find_map(|key| decode::<C>(token, key, &self.validation).ok())
         {
-            return Ok(());
+            return Ok(claims.claims);
         }
 
         Err(anyhow!("Invalid JWT signature"))
     }
 }
 
+/// JWT integration for the [warp](https://docs.rs/warp) framework.
+///
+/// Requires the `warp` feature.
 #[cfg(feature = "warp")]
 pub mod warp {
     use super::JwtValidator;
     use log::warn;
+    use serde_json::Value;
     use std::sync::Arc;
     use warp::{Filter, Rejection};
 
+    /// Warp rejection error emitted when a request is not authenticated.
     #[derive(Debug)]
     pub struct Unauthorized;
 
     impl warp::reject::Reject for Unauthorized {}
 
+    /// Authentication mode for the [`with_auth`] filter.
     #[derive(Clone)]
     pub enum AuthMode {
+        /// Validates the JWT token using the provided [`JwtValidator`].
         Validate(Arc<JwtValidator>),
+        /// Disables JWT verification (intended for non-production environments).
         SkipAuthentication,
     }
 
+    /// Builds a Warp filter that enforces the `Authorization: Bearer` header.
+    ///
+    /// - In [`AuthMode::Validate`] mode, the JWT token must be present and valid.
+    /// - In [`AuthMode::SkipAuthentication`] mode, all requests are accepted
+    ///   without verification (should only be used in non-production environments).
+    ///
+    /// On failure, the request is rejected with [`Unauthorized`].
     pub fn with_auth(
         auth_mode: AuthMode,
     ) -> impl Filter<Extract = ((),), Error = Rejection> + Clone {
@@ -105,10 +151,12 @@ pub mod warp {
                         Some(header) => {
                             match auth_mode {
                                 AuthMode::Validate(validator) => {
-                                    validator.validate_bearer_token(&header).map_err(|e| {
-                                        warn!("Unauthorized request: {}", e);
-                                        warp::reject::custom(Unauthorized)
-                                    })?;
+                                    validator.validate_bearer_token::<Value>(&header).map_err(
+                                        |e| {
+                                            warn!("Unauthorized request: {}", e);
+                                            warp::reject::custom(Unauthorized)
+                                        },
+                                    )?;
                                 }
                                 AuthMode::SkipAuthentication => unreachable!(),
                             }
@@ -126,6 +174,7 @@ pub mod warp {
 mod tests {
     use super::*;
     use jsonwebtoken::{encode, EncodingKey, Header};
+    use serde_json::Value;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -215,7 +264,7 @@ mod tests {
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(Some("test-key"));
         let auth = format!("Bearer {}", token);
-        assert!(validator.validate_bearer_token(&auth).is_ok());
+        assert!(validator.validate_bearer_token::<Value>(&auth).is_ok());
     }
 
     #[test]
@@ -224,7 +273,7 @@ mod tests {
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(None);
         let auth = format!("Bearer {}", token);
-        assert!(validator.validate_bearer_token(&auth).is_ok());
+        assert!(validator.validate_bearer_token::<Value>(&auth).is_ok());
     }
 
     #[test]
@@ -233,7 +282,7 @@ mod tests {
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(Some("unknown-key"));
         let auth = format!("Bearer {}", token);
-        let result = validator.validate_bearer_token(&auth);
+        let result = validator.validate_bearer_token::<Value>(&auth);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Unknown key id"));
     }
@@ -243,7 +292,7 @@ mod tests {
         let file = create_keys_yaml(&[("test-key", TEST_EC_PUBLIC_KEY_PEM)]);
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
         let token = make_token(Some("test-key"));
-        let result = validator.validate_bearer_token(&token);
+        let result = validator.validate_bearer_token::<Value>(&token);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Missing Bearer"));
     }
@@ -252,7 +301,7 @@ mod tests {
     fn validate_empty_bearer_token() {
         let file = create_keys_yaml(&[("test-key", TEST_EC_PUBLIC_KEY_PEM)]);
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
-        let result = validator.validate_bearer_token("Bearer ");
+        let result = validator.validate_bearer_token::<Value>("Bearer ");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("empty"));
     }
@@ -261,7 +310,7 @@ mod tests {
     fn validate_garbage_token() {
         let file = create_keys_yaml(&[("test-key", TEST_EC_PUBLIC_KEY_PEM)]);
         let validator = JwtValidator::load_from_file(file.path().to_str().unwrap()).unwrap();
-        let result = validator.validate_bearer_token("Bearer not.a.valid.jwt");
+        let result = validator.validate_bearer_token::<Value>("Bearer not.a.valid.jwt");
         assert!(result.is_err());
     }
 
@@ -276,7 +325,7 @@ mod tests {
         if let Ok(v) = validator {
             let token = make_token(None);
             let auth = format!("Bearer {}", token);
-            assert!(v.validate_bearer_token(&auth).is_err());
+            assert!(v.validate_bearer_token::<Value>(&auth).is_err());
         }
     }
 
@@ -293,7 +342,7 @@ mod tests {
         let token = encode(&header, &claims, &key).unwrap();
         let auth = format!("Bearer {}", token);
 
-        let result = validator.validate_bearer_token(&auth);
+        let result = validator.validate_bearer_token::<Value>(&auth);
         assert!(result.is_err());
     }
 }
