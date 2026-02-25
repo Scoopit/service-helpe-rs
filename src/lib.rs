@@ -13,6 +13,9 @@ pub mod warp;
 #[cfg(feature = "axum")]
 pub mod axum;
 
+#[cfg(feature = "jwt")]
+pub mod jwt;
+
 pub mod errors;
 
 pub mod config;

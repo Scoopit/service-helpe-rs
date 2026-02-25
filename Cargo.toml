@@ -19,6 +19,7 @@ tokio = ["dep:tokio"]
 warp = ["dep:warp"]
 axum = ["dep:axum", "http", "lazy_static", "futures", "tower"]
 tracing = ["dep:tracing", "uuid", "data-encoding"]
+jwt = ["jsonwebtoken", "serde_json"]
 
 [dependencies]
 serde = { version = "^1.0", features = ["derive"] }
@@ -45,3 +46,9 @@ futures = { version = "0.3", optional = true }
 
 uuid = { version = "1", features = ["v4"], optional = true }
 data-encoding = { version = "2", optional = true }
+jsonwebtoken = { version = "8", optional = true }
+serde_json = { version = "1", optional = true }
+
+
+[dev-dependencies]
+tempfile = "3"
