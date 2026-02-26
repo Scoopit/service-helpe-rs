@@ -174,6 +174,59 @@ pub mod warp {
     }
 }
 
+#[cfg(feature = "axum")]
+pub mod axum {
+    use std::sync::Arc;
+
+    use axum::{extract::Request, middleware::Next, response::Response};
+    use http::StatusCode;
+
+    use crate::jwt::JwtValidator;
+
+    /// Authentication mode for JWT-based bearer token validation.
+    #[derive(Clone)]
+    pub enum AuthMode {
+        /// Validates the JWT token using the provided [`JwtValidator`].
+        Validate(Arc<JwtValidator>),
+        /// Disables JWT verification (intended for non-production environments).
+        SkipAuthentication,
+    }
+
+    /// Axum middleware that enforces JWT bearer token authentication.
+    pub async fn auth_middleware(
+        auth_mode: AuthMode,
+        request: Request,
+        next: Next,
+    ) -> Result<Response, StatusCode> {
+        if let AuthMode::SkipAuthentication = &auth_mode {
+            return Ok(next.run(request).await);
+        }
+
+        let auth_header = request
+            .headers()
+            .get("authorization")
+            .and_then(|v| v.to_str().ok());
+
+        match auth_header {
+            Some(header) => {
+                if let AuthMode::Validate(validator) = &auth_mode {
+                    validator
+                        .validate_bearer_token::<serde_json::Value>(header)
+                        .map_err(|e| {
+                            log::warn!("Unauthorized request: {}", e);
+                            StatusCode::UNAUTHORIZED
+                        })?;
+                }
+                Ok(next.run(request).await)
+            }
+            None => {
+                log::warn!("Missing Authorization header");
+                Err(StatusCode::UNAUTHORIZED)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
